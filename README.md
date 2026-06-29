@@ -40,6 +40,3 @@ Untuk menjalankan seluruh skenario pengujian, gunakan perintah berikut di termin
 ```bash
 php artisan test
 ```
-
-## API Documentation
-Detail *endpoints*, parameter, dan format JSON *response* dapat dilihat pada file dokumentasi terpisah atau *Postman Collection* yang telah disediakan tim. Seluruh *response* JSON telah distandardisasi menggunakan helper `ApiFormatter`.
