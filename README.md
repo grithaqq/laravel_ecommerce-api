@@ -33,5 +33,13 @@ Proyek ini adalah sistem backend API untuk E-Commerce sederhana. API ini dibangu
    php artisan serve
    ```
 
+## 🧪 Automated Testing
+Proyek ini telah dilengkapi dengan *Feature Tests* menyeluruh untuk endpoint *Auth*, *Products*, dan *Orders*. Pengujian berjalan di dalam memori terisolasi (menggunakan SQLite `memory`), sehingga **tidak akan menghapus atau merusak data MySQL utama Anda**.
+
+Untuk menjalankan seluruh skenario pengujian, gunakan perintah berikut di terminal:
+```bash
+php artisan test
+```
+
 ## API Documentation
 Detail *endpoints*, parameter, dan format JSON *response* dapat dilihat pada file dokumentasi terpisah atau *Postman Collection* yang telah disediakan tim. Seluruh *response* JSON telah distandardisasi menggunakan helper `ApiFormatter`.
