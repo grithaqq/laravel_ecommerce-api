@@ -5,8 +5,11 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Order;
+use App\Models\OrderItem;
+use App\Models\Product;
 use App\Helpers\ApiFormatter;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\DB;
 
 class OrderController extends Controller
 {
@@ -16,9 +19,9 @@ class OrderController extends Controller
 
         // Customer sees their own orders, Admin sees all
         if ($user->role === 'admin') {
-            $orders = Order::orderBy('created_at', 'DESC')->get();
+            $orders = Order::with('orderItems.product')->orderBy('created_at', 'DESC')->get();
         } else {
-            $orders = Order::where('user_id', $user->id)->orderBy('created_at', 'DESC')->get();
+            $orders = Order::with('orderItems.product')->where('user_id', $user->id)->orderBy('created_at', 'DESC')->get();
         }
 
         return ApiFormatter::createJson(200, 'Get Orders Success', $orders);
@@ -26,24 +29,78 @@ class OrderController extends Controller
 
     public function store(Request $request)
     {
-        // This is a basic create order method just to test the table.
-        // The real checkout logic will be implemented later when order_items exist.
         $user = auth('api')->user();
 
-        $order = Order::create([
-            'user_id' => $user->id,
-            'order_date' => now(),
-            'total_amount' => $request->input('total_amount', 0),
-            'status' => 'pending'
+        $validator = Validator::make($request->all(), [
+            'items' => 'required|array|min:1',
+            'items.*.product_id' => 'required|exists:products,id',
+            'items.*.quantity' => 'required|integer|min:1',
         ]);
 
-        return ApiFormatter::createJson(201, 'Create Order Success', $order);
+        if ($validator->fails()) {
+            return ApiFormatter::createJson(400, 'Bad Request', $validator->errors()->all());
+        }
+
+        try {
+            DB::beginTransaction();
+
+            $totalAmount = 0;
+            $orderItemsData = [];
+
+            // 1. Loop through items to check stock and calculate total
+            foreach ($request->items as $item) {
+                // We use lockForUpdate() to prevent race conditions when multiple users buy at the same time
+                $product = Product::lockForUpdate()->find($item['product_id']);
+
+                if ($product->stock < $item['quantity']) {
+                    DB::rollBack();
+                    return ApiFormatter::createJson(400, 'Bad Request', 'Stok produk ' . $product->name . ' tidak mencukupi. Sisa stok: ' . $product->stock);
+                }
+
+                $totalAmount += ($product->price * $item['quantity']);
+
+                $orderItemsData[] = [
+                    'product' => $product,
+                    'quantity' => $item['quantity'],
+                    'price_per_item' => $product->price
+                ];
+            }
+
+            // 2. Create the Order (Nota Utama)
+            $order = Order::create([
+                'user_id' => $user->id,
+                'order_date' => now(),
+                'total_amount' => $totalAmount,
+                'status' => 'pending'
+            ]);
+
+            // 3. Create Order Items & Deduct Stock
+            foreach ($orderItemsData as $data) {
+                OrderItem::create([
+                    'order_id' => $order->id,
+                    'product_id' => $data['product']->id,
+                    'quantity' => $data['quantity'],
+                    'price_per_item' => $data['price_per_item']
+                ]);
+
+                // Deduct stock
+                $data['product']->decrement('stock', $data['quantity']);
+            }
+
+            DB::commit();
+
+            return ApiFormatter::createJson(201, 'Checkout Success', $order->load('orderItems.product'));
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return ApiFormatter::createJson(500, 'Internal Server Error', $e->getMessage());
+        }
     }
 
     public function show($id)
     {
         $user = auth('api')->user();
-        $order = Order::find($id);
+        $order = Order::with('orderItems.product')->find($id);
 
         if (is_null($order)) {
             return ApiFormatter::createJson(404, 'Order Not Found');
