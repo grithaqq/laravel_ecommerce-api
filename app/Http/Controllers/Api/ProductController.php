@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Product;
 use Illuminate\Http\Request;
+use App\Helpers\ApiFormatter;
 
 class ProductController extends Controller
 {
@@ -13,16 +14,17 @@ class ProductController extends Controller
     {
         $products = Product::all();
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Daftar Produk',
-            'data' => $products
-        ], 200);
+        return ApiFormatter::createJson(200, 'Daftar Produk', $products);
     }
 
     // Menyimpan data baru
     public function store(Request $request)
     {
+        $user = auth('api')->user();
+        if (!$user || $user->role !== 'admin') {
+            return ApiFormatter::createJson(403, 'Forbidden', 'Hanya admin yang dapat menambah produk');
+        }
+
         $request->validate([
             'name'        => 'required|string|max:255',
             'description' => 'required|string',
@@ -32,11 +34,7 @@ class ProductController extends Controller
 
         $product = Product::create($request->all());
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Produk berhasil ditambahkan',
-            'data' => $product
-        ], 201);
+        return ApiFormatter::createJson(201, 'Produk berhasil ditambahkan', $product);
     }
 
     // Menampilkan detail produk
@@ -45,28 +43,24 @@ class ProductController extends Controller
         $product = Product::find($id);
 
         if (!$product) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Produk tidak ditemukan'
-            ], 404);
+            return ApiFormatter::createJson(404, 'Not Found', 'Produk tidak ditemukan');
         }
 
-        return response()->json([
-            'success' => true,
-            'data' => $product
-        ], 200);
+        return ApiFormatter::createJson(200, 'Detail Produk', $product);
     }
 
     // Mengubah data produk
     public function update(Request $request, $id)
     {
+        $user = auth('api')->user();
+        if (!$user || $user->role !== 'admin') {
+            return ApiFormatter::createJson(403, 'Forbidden', 'Hanya admin yang dapat mengubah produk');
+        }
+
         $product = Product::find($id);
 
         if (!$product) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Produk tidak ditemukan'
-            ], 404);
+            return ApiFormatter::createJson(404, 'Not Found', 'Produk tidak ditemukan');
         }
 
         $request->validate([
@@ -78,30 +72,25 @@ class ProductController extends Controller
 
         $product->update($request->all());
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Produk berhasil diperbarui',
-            'data' => $product
-        ], 200);
+        return ApiFormatter::createJson(200, 'Produk berhasil diperbarui', $product);
     }
 
     // Menghapus produk
     public function destroy($id)
     {
+        $user = auth('api')->user();
+        if (!$user || $user->role !== 'admin') {
+            return ApiFormatter::createJson(403, 'Forbidden', 'Hanya admin yang dapat menghapus produk');
+        }
+
         $product = Product::find($id);
 
         if (!$product) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Produk tidak ditemukan'
-            ], 404);
+            return ApiFormatter::createJson(404, 'Not Found', 'Produk tidak ditemukan');
         }
 
         $product->delete();
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Produk berhasil dihapus'
-        ], 200);
+        return ApiFormatter::createJson(200, 'Produk berhasil dihapus', null);
     }
 }
