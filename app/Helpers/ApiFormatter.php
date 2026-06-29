@@ -18,4 +18,17 @@ class ApiFormatter
 
         return response()->json(self::$response, self::$response['code']);
     }
+
+    public static function filterSensitiveData(array $data = []): array
+    {
+        $sensitiveFields = ['password', 'password_confirmation', 'token', 'api_key', 'secret'];
+
+        foreach ($sensitiveFields as $field) {
+            if (array_key_exists($field, $data)) {
+                $data[$field] = '[FILTERED]';
+            }
+        }
+
+        return $data;
+    }
 }
